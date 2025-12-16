@@ -2,23 +2,22 @@ import json
 from pathlib import Path
 from datetime import datetime
 
-#finds directory, makes sure data file exists, creates new data file
-PROGRAM_DIR = Path(__file__).parent
-DATA_DIR = PROGRAM_DIR / "data"
-DATA_DIR.mkdir(exist_ok=True)
-STORED_EXPENSES_FILE = DATA_DIR / "stored_expenses.json"
+import import_utils
 
-#tried to make this a more polished version of the profitCalculator as I was writing it, so some things are declared differently
-class expenseCalculator:
-    
-    def __init__(self, customer):
+
+#todo in near future:
+#use dispatch tables instead of elif chain
+#load json file only once then pull it from memory when changing it (use import_utils.methods for this)
+
+class ExpenseCalculator:
+
+    def __init__(self):
         #variable initialization
         self.expense_type = None
         self.expense_amount = None
         self.expense_description = None
         self.expense_ID = None
         self.expense_date = None
-        self.total_expenses = None
 
     def expense_stored_object(self):
         expense_obj = {
@@ -27,7 +26,6 @@ class expenseCalculator:
             "expense_description": self.expense_description,
             "expense_ID": self.expense_ID,
             "expense_date": self.expense_date,
-            "total_expenses": self.total_expenses,
         }
         return expense_obj
 
@@ -35,9 +33,8 @@ class expenseCalculator:
         while True:
             expense_type = input("Input Expense Type: ")
             confirm1 = input(f"Is {expense_type} correct? (y/n): ")
-            #redo ALL of these with .strip().lower() like below
-            stripped1 = confirm1.strip().lower()
-            if stripped1 in ["true", "t", "yes", "y"]:
+
+            if import_utils.is_yes_utils(confirm1):
                 self.expense_type = expense_type
                 print("Expense Type Initialized.")
                 return self.expense_type
@@ -48,14 +45,14 @@ class expenseCalculator:
     def expense_amount_neg_function(self):
         while True:
             try:
-                expense_amount = int(input("Input Expense Amount ($): "))
+                expense_amount = float((input("Input Expense Amount ($): ")).strip())
             except ValueError:
                 print("Invalid input! Please enter a number for expense amount. Reprompting...")
                 continue
             
             #expense amount
             confirm2 = input(f"Is {expense_amount} correct? (y/n): ")
-            if confirm2 in ["T", "True", "TRUE", "true", "t", "yes", "y", "Yes", "Y", "YES"]:
+            if import_utils.is_yes_utils(confirm2):
                 self.expense_amount = expense_amount
                 print("Amount Initialized.")
             else:
@@ -70,7 +67,8 @@ class expenseCalculator:
         while True:
             expense_description = input("Input Expense Description: ")
             confirm3 = input(f"Is {expense_description} correct? (y/n): ")
-            if confirm3 in ["T", "True", "TRUE", "true", "t", "yes", "y", "Yes", "Y", "YES"]:
+
+            if import_utils.is_yes_utils(confirm3):
                 self.expense_description = expense_description
                 return self.expense_description
             else:
@@ -78,25 +76,17 @@ class expenseCalculator:
                 continue
 
     def expense_input(self):
-        while True:
-
             self.expense_type = self.expense_type_function()
-            
             self.expense_amount = self.expense_amount_neg_function()
-            
             self.expense_description = self.expense_description_function()
-            
             self.expense_ID = self.expense_id_plusplus()
-            
             self.expense_date = self.define_expense_date()
-            
-            self.total_expenses = self.total_expense_calculation()
 
-            #store expense obj to new .json
             self.store_expense_object()
+
+            import_utils.npc_confirm()
             
             print("New Expense Stored.")
-            
             return
     
     def define_expense_date(self):
@@ -109,31 +99,27 @@ class expenseCalculator:
          
         stored_expenses_1 = []
         
-        if STORED_EXPENSES_FILE.exists():
+        if import_utils.STORED_EXPENSES_FILE.exists():
             try:
-                with STORED_EXPENSES_FILE.open("r", encoding="utf-8") as f:
+                with import_utils.STORED_EXPENSES_FILE.open("r", encoding="utf-8") as f:
                     stored_expenses_1 = json.load(f)
             except json.JSONDecodeError:
-                print("stored_expenses.json exists but is not valid JSON or internal stored_expenses.json code is not valid (DEBUG: go to save_expense_object funct)")
-                return 0
+                raise RuntimeError("stored_expenses.json is corrupted (DEBUG: go to save_expense_object funct)")
         else:
             stored_expenses_1 = []
 
         stored_expenses_1.append(expense_data)
 
         # open "w" - will automatically create stored_expense.json if it does not exist
-        with STORED_EXPENSES_FILE.open("w", encoding="utf-8") as f:
+        with import_utils.STORED_EXPENSES_FILE.open("w", encoding="utf-8") as f:
             json.dump(stored_expenses_1, f, indent=2)
 
     def expense_id_plusplus(self):
-        if not STORED_EXPENSES_FILE.exists():
-            return 1
-
-        if self.expense_ID == None:
+        if not import_utils.STORED_EXPENSES_FILE.exists():
             return 1
 
         try:
-            with STORED_EXPENSES_FILE.open("r", encoding="utf-8") as f:
+            with import_utils.STORED_EXPENSES_FILE.open("r", encoding="utf-8") as f:
                 expenses_file = json.load(f)
 
             if not expenses_file:
@@ -143,51 +129,21 @@ class expenseCalculator:
             return last_listed_expense_id + 1
         
         except (json.JSONDecodeError, KeyError, IndexError):
-            print("DEBUG: expense_id_plusplus funct error, error opening STORED_EXPENSES_FILE. Returning 1 for order_ID.")
+            print("DEBUG: expense_id_plusplus funct error, error opening import_utils.STORED_EXPENSES_FILE. Returning 1 for order_ID.")
             return 1
-
-
-    def total_expense_calculation(self):
-        
-        if not STORED_EXPENSES_FILE.exists():
-            self.total_expenses = self.expense_amount
-            return self.total_expenses
-
-        
-        
-        with STORED_EXPENSES_FILE.open("r", encoding="utf-8") as f:
-            expenses_file = json.load(f)
-        
-        total_expenses = 0
-        
-        for ii in range(len(expenses_file)):
-            total_expenses += expenses_file[ii]["expense_amount"]
-        
-        self.total_expenses = total_expenses + self.expense_amount
-
-        if self.total_expenses is None:
-            self.total_expenses == self.expense_amount
-
-        return self.total_expenses
     
     def request_expense_stats(self):
-        if not STORED_EXPENSES_FILE.exists():
-            return print("stored_expenses.json does not exist. By extension no expense stats exist.")
-        
+        if not import_utils.STORED_EXPENSES_FILE.exists():
+            print("stored_expenses.json does not exist. By extension no expense stats exist.")
+            return
+
         while True:
             input2 = input("Choose what to display: expense total (et), display array (da), or exit (e): ")
             stripped = input2.strip().lower()
             
             if stripped in ["et", "expensetotal"]: 
-                try:
-                    with STORED_EXPENSES_FILE.open("r", encoding="utf-8") as f:
-                        expenses_file = json.load(f)
-                except (json.JSONDecodeError, KeyError, IndexError):
-                    print("DEBUG: JSON error at request_expense_stats")
-                    return 1
-                
-                expense_total =  expenses_file[-1]["total_expenses"]
-                print(expense_total)
+                expense_total = self.calculate_total_expenses()
+                print(f"Expense Total: {expense_total}")
                 return expense_total
             
             elif stripped in ["da", "displayarray"]:
@@ -202,51 +158,62 @@ class expenseCalculator:
                 continue
 
     def display_stored_expenses_array(self):
-        if not STORED_EXPENSES_FILE.exists():
-            return print("DEBUG: display_stored_expenses_array, no valid stored_expenses.json file")
-        
-        with STORED_EXPENSES_FILE.open("r", encoding="utf-8") as f:
-            stored_expenses = json.load(f)
+        if not import_utils.STORED_EXPENSES_FILE.exists():
+            print("DEBUG: display_stored_expenses_array, no valid stored_expenses.json file")
+            return []
 
-            return print(stored_expenses)
+        try:
+            with import_utils.STORED_EXPENSES_FILE.open("r", encoding="utf-8") as f:
+                stored_expenses = json.load(f)
+                print(stored_expenses)
+                return stored_expenses
+        except json.JSONDecodeError:
+            print("stored_expenses.json is corrupted. Returning...")
+            return
+
+    def calculate_total_expenses(self):
+        if not import_utils.STORED_EXPENSES_FILE.exists():
+            return 0
+        
+        with import_utils.STORED_EXPENSES_FILE.open("r", encoding="utf-8") as f:
+            expenses_file = json.load(f)
+        return sum(ii["expense_amount"] for ii in expenses_file)
+
 
     def delete_expense(self):
-        print("Current array: ")
-        stored_expenses_array = self.display_stored_expenses_array()
-        
-        max = len(stored_expenses_array) - 1
         while True:
-            try:
-                index = int(input(f"Enter the index (0 to {max}), that you would like to delete: "))
+            print("Current array: ")
+            stored_expenses_array = self.display_stored_expenses_array()
+            
+            max_index = len(stored_expenses_array) - 1
+            while True:
+                try:
+                    index = int(input(f"Enter the index (0 to {max_index}), that you would like to delete: "))
 
-                if index < 0 or index > max:
-                    print("Index out of bounds. Reprompting...")
+                    if index < 0 or index > max_index:
+                        print("Index out of bounds. Reprompting...")
+                        continue
+                    else:
+                        break
+                except ValueError:
+                    print("Please enter a value number. Reprompting...")
                     continue
-                else:
-                    break
-            except ValueError:
-                print("Please enter a value number. Reprompting...")
-                continue
                 
-        popped = stored_expenses_array.pop(index)
-            
-        value_confirmation = input(f"Is index {popped} the desired value? (y/n): ")
-        stripped = value_confirmation.strip().lower()
-        if stripped in ["true", "t", "yes", "y"]:
-            print("Value confirmed!")
-        else:
-            #probably some way to reappend popped and resort array so we don't have to manually reprompt (put all this code in the while True loop), but this is easier
-            print("Please Reprompt.")
-            return
-        
-        #restore file
-        with STORED_EXPENSES_FILE.open("w", encoding="utf-8") as f:
-            json.dump(stored_expenses_array, f, indent=2)
+            value_confirmation = input(f"Is index {index} the desired value? (y/n): ")
 
-            print(f"Deleted: {popped}")
-            
+            if import_utils.is_yes_utils(value_confirmation):
+                print("Value confirmed!")
+                popped = stored_expenses_array.pop(index)
+                with import_utils.STORED_EXPENSES_FILE.open("w", encoding="utf-8") as f:
+                    json.dump(stored_expenses_array, f, indent=2)
+                print(f"Deleted: {popped}")
+                return
+            else:
+                print("Not the desired value? Reprompting...")
+                continue
 
     def DEBUG_expense_prompt_handler(self):
+        #need to add dispatch table later, for profit and netProfit aswell
         while True:
             input_e = input("---\nInput expense (e), Request expense stats (res), Delete expense (d), or Exit (exit): ")
             stripped = input_e.strip().lower()
@@ -261,13 +228,13 @@ class expenseCalculator:
                 self.delete_expense()
             
             elif stripped in ["exit"]:
-                return print("Exited")
+                print("Exited")
+                return
 
             else:
                 print("Error: Invalid Prompt Handler Input")
 
 
 if __name__ == "__main__":
-    ec = expenseCalculator("Example Expense") 
-
+    ec = ExpenseCalculator()
     ec.DEBUG_expense_prompt_handler()
