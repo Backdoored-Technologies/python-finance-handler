@@ -2,28 +2,32 @@ from pathlib import Path
 import json
 from datetime import datetime
 
-#information obtained from jsons below
+#filepath for stored_netvalues.json
 PROGRAM_DIR = Path(__file__).parent
 DATA_DIR = PROGRAM_DIR /  "data"
 DATA_DIR.mkdir(exist_ok=True)
 
+#file declaration
 STORED_EXPENSES_FILE = DATA_DIR / "stored_expenses.json"
 STORED_ORDERS_FILE = DATA_DIR / "stored_orders.json"
 STORED_NETVALUES_FILE = DATA_DIR / "stored_netvalues.json"
 
 
-class netProfitCalculator:
+class NetProfitCalculator:
 
     def __init__(self):
-        self.total_expenses = None
-        self.total_profits = None
-        self.net_profit = None
-        self.date = None
-        self.profit_items_amount = None
-        self.expense_items_amount = None
+        #changed this for less TypeErrors being raised later
+
+
+
+        self.total_expenses = 0
+        self.total_profits = 0
+        self.net_profit = 0
+        self.date = ""
+        self.profit_items_amount = 0
+        self.expense_items_amount = 0
 
     def net_profit_object(self):
-        #just made this return the dict, thought it was simpler than making it return a newly declared variable
         return {
             "total_expenses": self.total_expenses,
             "total_profits": self.total_profits,
@@ -33,98 +37,82 @@ class netProfitCalculator:
             "expense_items_amount": self.expense_items_amount,
         }
     
-    def net_profit_calculation(self):
-        #could import this into expense + profit Handler and have it run each time any change is made, but this seems simpler
-        while True:
-            self.empty_file_checker()
+    def net_profit_calculation(self, show_prompt: bool = True):
 
-            self.clear_netvalues_file()
+        self.empty_file_checker()
 
-            self.fetch_expenses()
+        orders_f = self.load_json(STORED_ORDERS_FILE)
+        expenses_f = self.load_json(STORED_EXPENSES_FILE)
 
-            self.fetch_profits()
+        self.update_expenses(expenses_f)
+        self.update_profits(orders_f)
 
-            #added since self.total_expenses is negative
-            self.net_profit = self.total_profits + self.total_expenses
-            
-            self.date = datetime.now().strftime("%m-%d-%Y")
-            
-            self.fetch_profit_items_amount()
-            
-            self.fetch_expenses_items_amount()
+        #added since self.total_expenses is negative
+        self.net_profit = self.total_profits + self.total_expenses
+        self.date = datetime.now().strftime("%m-%d-%Y")
+        
+        self.update_profit_items_amount(orders_f)
+        self.update_expenses_items_amount(expenses_f)
 
-            self.save_net_profit_object()
+        self.save_net_profit_object()
+        if show_prompt:
+            #no dispatch table here because I'm lazy
+            if input("Do you want to display net profit stats? (y/n): ") in ["y", "yes", "t", "true"]:
+                print(f"Current stats: {self.net_profit_object()}")
 
-            return print(f"Current file contents: {self.net_profit_object()}")
+        return self.net_profit_object()
+
+
+
+    def load_json(self, path: Path):
+        with path.open("r", encoding="utf-8") as f:
+            return json.load(f)
 
     @staticmethod
     def empty_file_checker():
         if not STORED_NETVALUES_FILE.exists():
             with STORED_NETVALUES_FILE.open("w", encoding="utf-8") as f:
-               json.dump([], f) 
+               json.dump({}, f) 
 
-        if not STORED_EXPENSES_FILE.exists() or not STORED_ORDERS_FILE.exists():
-            return print("DEBUG: stored_expenses.json  OR  stored_orders.json does not exist. net_profit_calculation funct")
+        if not STORED_ORDERS_FILE.exists():
+            raise FileNotFoundError("DEBUG: stored_orders.json does not exist.")
         
-    #add optional user input function for displaying data
-    
+        if not STORED_EXPENSES_FILE.exists():
+            raise FileNotFoundError("DEBUG: stored_expenses.json does not exist")
 
-    def fetch_expenses(self):
-        with STORED_EXPENSES_FILE.open("r", encoding="utf-8") as f:
-            stored_expenses_data = json.load(f)
-            if not stored_expenses_data:
+#could have combined update_profits/expense and update_p/e_items_amount functions, but I wanted to keep them seperate
+#and instead found another solution for reducing disk reads
+    def update_expenses(self, expenses_f):
+            if not expenses_f:
                 self.total_expenses = 0
-                return self.total_expenses
+                return
              
-            self.total_expenses = stored_expenses_data[-1]["total_expenses"]
+            self.total_expenses = sum(ii["expense_amount"] for ii in expenses_f)
+            return
 
-    def fetch_profits(self):
-        with STORED_ORDERS_FILE.open("r", encoding="utf-8") as f:
-            stored_orders_data = json.load(f)
-            if not stored_orders_data:
+    def update_profits(self, expenses_f):
+            if not expenses_f:
                 self.total_profits = 0
-                return self.total_profits
+                return 
             
-            self.total_profits = stored_orders_data[-1]["total_profit"]
+            self.total_profits = sum(ii["total_profit"] for ii in expenses_f)
+            return
 
-    def fetch_profit_items_amount(self):
-        with STORED_ORDERS_FILE.open("r", encoding="utf-8") as f:
-            stored_order_data = json.load(f)
-            stored_order_data_length = len(stored_order_data)
-            self.profit_items_amount = stored_order_data_length
+    def update_profit_items_amount(self, orders_f):
+            self.profit_items_amount = len(orders_f)
+            return
             
-    def fetch_expenses_items_amount(self):
-        with STORED_EXPENSES_FILE.open("r", encoding="utf-8") as f:
-            stored_expense_data = json.load(f)
-            stored_expense_data_length = len(stored_expense_data)
-            self.expense_items_amount = stored_expense_data_length
+    def update_expenses_items_amount(self, expenses_f):
+            self.expense_items_amount  = len(expenses_f)
+            return
 
     def save_net_profit_object(self):
-        try:
-            with STORED_NETVALUES_FILE.open("r", encoding="utf-8") as f:
-                current_file = json.load(f)
-        except json.JSONDecodeError:
-            return print("DEBUG: JSONDecodeError save_net_profit_object function")
-        
-        current_file.append(self.net_profit_object())
+        current_file_obj = self.net_profit_object()
 
         with STORED_NETVALUES_FILE.open("w", encoding="utf-8") as f:
-            json.dump(current_file, f, indent=2)
+            json.dump(current_file_obj, f, indent=2)
     
-    @staticmethod
-    def clear_netvalues_file():
-        if not STORED_NETVALUES_FILE.exists():
-            return
-        
-        with STORED_NETVALUES_FILE.open("r", encoding="utf-8") as f:
-            data = json.load(f)
-
-        data.clear()  #data.clear() is slightly faster despite (data = []) having better time complexity
-
-        with STORED_NETVALUES_FILE.open("w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2)
 
 if __name__ == "__main__":
-    npc = netProfitCalculator()
-
+    npc = NetProfitCalculator()
     npc.net_profit_calculation()
