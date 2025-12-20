@@ -3,6 +3,7 @@ from expenseHandler import ExpenseCalculator
 from netProfitHandler import NetProfitCalculator
 
 
+
 def run_profit():
         pc = ProfitCalculator()
         pc.DEBUG_profit_prompt_handler()
@@ -11,9 +12,12 @@ def run_expense():
         ec = ExpenseCalculator() 
         ec.DEBUG_expense_prompt_handler()
     
+
 def run_net_profit():
         npc = NetProfitCalculator()
-        npc.net_profit_calculation()
+        stats = npc.net_profit_calculation()
+        print(stats)
+
 
 def exit_function():
         print("Exited at the Top Level.")
@@ -37,7 +41,7 @@ def main():
         "exit": ("exit", "stop"),
     }
     while True:
-        initial_input = input("CHOOSE: Profit application (p), Expense application (e), Check stats (c), or Exit (exit): ")
+        initial_input = input("\nCHOOSE: Profit application (p), Expense application (e), Check stats (c), or Exit (exit): ")
         initial_stripped = initial_input.strip().lower()
 
         for command, aliases_var in alias_list.items():
@@ -51,6 +55,8 @@ def main():
 if __name__ == "__main__":
     main()
 
-    #to do:
-#make dispatch table for profitHandler and expenseHandler
-# need to more efficiently implement import_utils functions (like load/save_json_utils)
+# To do:
+#make new function for duplicated code (delete function) in import_utils
+#make new function for duplicated code (input confirmation loops like expense type, amount, and description) in import_utils
+#make a new function for load_json, append, then save_json in import_utils
+#cache json better

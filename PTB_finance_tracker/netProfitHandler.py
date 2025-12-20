@@ -17,9 +17,6 @@ class NetProfitCalculator:
 
     def __init__(self):
         #changed this for less TypeErrors being raised later
-
-
-
         self.total_expenses = 0
         self.total_profits = 0
         self.net_profit = 0
@@ -36,9 +33,10 @@ class NetProfitCalculator:
             "profit_items_amount": self.profit_items_amount,
             "expense_items_amount": self.expense_items_amount,
         }
-    
-    def net_profit_calculation(self, show_prompt: bool = True):
 
+
+
+    def net_profit_calculation(self,):
         self.empty_file_checker()
 
         orders_f = self.load_json(STORED_ORDERS_FILE)
@@ -55,11 +53,9 @@ class NetProfitCalculator:
         self.update_expenses_items_amount(expenses_f)
 
         self.save_net_profit_object()
-        if show_prompt:
-            #no dispatch table here because I'm lazy
-            if input("Do you want to display net profit stats? (y/n): ") in ["y", "yes", "t", "true"]:
-                print(f"Current stats: {self.net_profit_object()}")
-
+        
+        #i return the value here so the user knows what to pick, no show prompt is required because you can just isolate
+        # the desired value from the self.net_project_object returned and make the user either display it or not at runtime
         return self.net_profit_object()
 
 
@@ -80,8 +76,6 @@ class NetProfitCalculator:
         if not STORED_EXPENSES_FILE.exists():
             raise FileNotFoundError("DEBUG: stored_expenses.json does not exist")
 
-#could have combined update_profits/expense and update_p/e_items_amount functions, but I wanted to keep them seperate
-#and instead found another solution for reducing disk reads
     def update_expenses(self, expenses_f):
             if not expenses_f:
                 self.total_expenses = 0
@@ -90,12 +84,12 @@ class NetProfitCalculator:
             self.total_expenses = sum(ii["expense_amount"] for ii in expenses_f)
             return
 
-    def update_profits(self, expenses_f):
-            if not expenses_f:
+    def update_profits(self, orders_f):
+            if not orders_f:
                 self.total_profits = 0
                 return 
             
-            self.total_profits = sum(ii["total_profit"] for ii in expenses_f)
+            self.total_profits = sum(ii["amount_paid"] for ii in orders_f)
             return
 
     def update_profit_items_amount(self, orders_f):
@@ -116,3 +110,4 @@ class NetProfitCalculator:
 if __name__ == "__main__":
     npc = NetProfitCalculator()
     npc.net_profit_calculation()
+

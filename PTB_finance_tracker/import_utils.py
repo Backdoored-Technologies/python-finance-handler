@@ -18,6 +18,8 @@ NO_VALUES = {"no", "n", "f", "false"}
 
 
 
+#     UTILITY FUNCTIONS
+
 #yes/no logic with type hinting
 def is_yes_utils(s: str) -> bool:
     return bool(s and s.strip().lower() in YES_VALUES)
@@ -39,16 +41,41 @@ def load_json_utils(f_path: Path):
 
 def save_json_utils(f_path: Path, data):
     with f_path.open("w", encoding="utf-8") as f:
-        return json.dump(data, f, indent=2)
-    
+        json.dump(data, f, indent=2)
+        return
+
+def ge_file_checker(path: Path):
+    try:
+        orders = load_json_utils(path)
+    except FileNotFoundError:
+        print(f"{path} does not exist. Creating new file...")
+        orders = []
+        save_json_utils(path, orders)
+    except json.JSONDecodeError:
+        print("stored_orders.json is corrupted.")
+        
+    return
+
+
+
+#                NPC TOTAL FUNCTIONS
 
 #core total logic
-def npc_confirm(show_prompt=False):
-    #gotta create an instance so it's runnable
+def npc_confirm(show=None):
     npc = NetProfitCalculator()
-    return npc.net_profit_calculation(show_prompt=show_prompt)
+    req = npc.net_profit_calculation()
 
-#to do:
-#factor import_utils.py into profitHandler and optimize it
-#after this optimize expenseHandler.py
-#then sleep
+
+    if show == "total_expenses":
+        #printing isn't necessary, could just print at runtime. im just lazy
+        return print(req["total_expenses"])
+         
+    if show == "total_profits":
+        return print(req["total_profits"])
+
+    if show is None:
+        return req
+
+    #gets value out of object returned by net_profit_calculation
+    return req.get(show)
+

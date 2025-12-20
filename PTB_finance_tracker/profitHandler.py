@@ -10,25 +10,11 @@ class ProfitCalculator:
 
     def __init__(self):
         # maybe make a login system in the distant future.
-        self.customer = None
-        self.order_ID = None
-        self.amount_paid = None
-        self.timestamp = None
-        #self.total_profit = None
+        self.customer = ""
+        self.order_ID = 1
+        self.amount_paid = 0
+        self.timestamp = ""
 
-    def prompt_amount(self):
-        while True:
-            self.customer = self.define_customer()
-            self.order_ID = self.obtain_next_order_id()
-            self.amount_paid = self.amount_paid_input_function()
-            self.timestamp = datetime.now().strftime("%m-%d-%Y")
-            #self.total_profit = self.total_profit_calculation()
-
-            import_utils.npc_confirm()
-
-            self.save_order_to_file()
-
-            return
 
     def stored_order_data_function(self):
         return {
@@ -36,44 +22,80 @@ class ProfitCalculator:
             "order_ID": self.order_ID,
             "amount_paid": self.amount_paid,
             "timestamp": self.timestamp,
-            #"total_profit": self.total_profit,
         }
+
+    def dt_profit_prompt_handler(self):
+        return {
+            #profit input
+            "p": self.prompt_amount,
+            "profit": self.prompt_amount,
+            "input": self.prompt_amount,
+            "inputprofit": self.prompt_amount,
+            
+            #stats
+            "r": self.request_stats_function,
+            "request": self.request_stats_function,
+            "requeststats": self.request_stats_function,
+
+            #delete customer
+            "d": self.delete_customer_order,
+            "delete": self.delete_customer_order,
+            "deletecustomer": self.delete_customer_order,
+
+            #exit
+            "e": lambda: exit(),
+            "exit": lambda: exit(),
+
+        }
+    
+    def dt_request_stats(self):
+        return {
+            "d": self.read_and_display_order_file,
+            "da": self.read_and_display_order_file,
+            "display": self.read_and_display_order_file,
+            "displayorderarray": self.read_and_display_order_file,
+
+            "t": import_utils.npc_confirm,
+            "total": import_utils.npc_confirm,
+            "profittotal": import_utils.npc_confirm,
+
+            "e": lambda: exit(),
+            "exit": lambda: exit(),
+        }
+
+    def prompt_amount(self):
+    
+        self.customer = self.define_customer()
+        self.order_ID = self.obtain_next_order_id()
+
+        while True:
+            amount = self.amount_paid_input_function()  
+            if amount is not None:
+                break
+
+        self.timestamp = datetime.now().strftime("%m-%d-%Y")
+        self.save_order_to_file()
+
+        import_utils.npc_confirm()
+        return
 
 
     def read_and_display_order_file(self):
-        if import_utils.STORED_ORDERS_FILE.exists():
-            try:
-                with import_utils.STORED_ORDERS_FILE.open("r", encoding="utf-8") as f:
-                    stored_orders_1 = json.load(f)
-                    print(stored_orders_1)
-            except json.JSONDecodeError:
-                print("stored_orders.json exists but is not valid JSON")
-                return 0
-        else:
-            print("Can not find STORED_ORDERS_FILE")
-            return 0
+        data_read = import_utils.load_json_utils(import_utils.STORED_ORDERS_FILE)
+        print(data_read)
+        return data_read
+    
 
     def save_order_to_file(self):
-        #data = stored data array
         data = self.stored_order_data_function()
         
-        stored_orders_2 = []
+        stored_orders_2 = import_utils.load_json_utils(import_utils.STORED_ORDERS_FILE)
         
-        if import_utils.STORED_ORDERS_FILE.exists():
-            try:
-                with import_utils.STORED_ORDERS_FILE.open("r", encoding="utf-8") as f:
-                    stored_orders_2 = json.load(f)
-            except json.JSONDecodeError:
-                print("stored_orders.json exists but is not valid JSON (DEBUG: save_order_to_file funct)")
-                return 0
-        else:
-            stored_orders_2 = []
-
         stored_orders_2.append(data)
 
-        with import_utils.STORED_ORDERS_FILE.open("w", encoding="utf-8") as f:
-            json.dump(stored_orders_2, f, indent=2)
-        
+        import_utils.save_json_utils(import_utils.STORED_ORDERS_FILE, stored_orders_2)
+        return
+
     def display_order_confirmation(self):
         reprompt1 = input("Do you want to display the order array? (y/n): ")
         while True:
@@ -93,41 +115,44 @@ class ProfitCalculator:
                     print("Invalid input. Exiting...")
                     break
     
+
     def define_customer(self):
         while True:
-            customer_name = input("Please input customer name: ")
+            customer_name = input("\nPlease input customer name: ")
             customer_check = input(f"Is '{customer_name}' correct? (y/n): ")
             if not import_utils.is_yes_utils(customer_check):
                 print("Invalid Input. Reprompting...")
                 continue
             self.customer = customer_name
             print(f"Customer name defined as: {self.customer}")
-            return 
+            return self.customer
     
     def delete_customer_order(self):
-        #delete a customer's order in stored_orders.json by index
+        #neat bit of optimization here with the print + returned value all in one
         print("Current array: ")
-        self.read_and_display_order_file()
-        
-        if not import_utils.STORED_ORDERS_FILE.exists():
-            print("No orders file found. DEBUG: read_and_display_order returned 0.")
+        orders_file1 = self.read_and_display_order_file()
+
+        if not orders_file1:
+            print("No orders left to delete.")
             return
         
-        with import_utils.STORED_ORDERS_FILE.open("r", encoding="utf-8") as f:
-            orders_file1 = json.load(f)
-
+        # ADD SEARCH BY NAME, and then specify options with the date
         max_index = len(orders_file1) - 1
         while True:
             try:
-                index = int(input(f"Enter the index (0 to {max_index}), that you would like to delete: "))
-                #print the indexed file and confirm
+                init_inp = input(f"\nEnter the index (0 to {max_index}), that you would like to delete or cancel (c): ").strip().lower()
+                
+                if init_inp in ("c", "cancel"):
+                    return
+                
+                index = int(init_inp)
                 if index < 0 or index > max_index:
                     print("Index out of bounds. Reprompting...")
                     continue
             except ValueError:
                 print("Please enter a value number. Reprompting...")
                 continue
-            index_confirmation = input(f"Is index {index} \n ({orders_file1[index]}) \n the desired value? (y/n): ")
+            index_confirmation = input(f"\nIs index {index} \n ({orders_file1[index]}) \n the desired value? (y/n): ")
             if import_utils.is_yes_utils(index_confirmation):
                 break
             else:
@@ -136,22 +161,22 @@ class ProfitCalculator:
         
         deleted_index = orders_file1.pop(index)
         print(f"Deleted: {deleted_index}")
-        with import_utils.STORED_ORDERS_FILE.open("w", encoding="utf-8") as f:
-            json.dump(orders_file1, f, indent=2)
+
+        import_utils.save_json_utils(import_utils.STORED_ORDERS_FILE, orders_file1)
+        return
+    
 
     def obtain_next_order_id(self):
-        # I chose to obtain orderID to increment from the stored_orders file, but you could just store it in a seperate (.txt) to increment
         if not import_utils.STORED_ORDERS_FILE.exists():
             return 1
 
         try:
-            with import_utils.STORED_ORDERS_FILE.open("r", encoding="utf-8") as f:
-                orders_file = json.load(f)
+            orders_file = import_utils.load_json_utils(import_utils.STORED_ORDERS_FILE)
 
             if not orders_file:
                 return 1
             
-            #coudl also use [len(orders_file) - 1]["order_ID"]
+            #figure out a different way to do this later, this could introduce inconsistencies when deleting orders
             last_listed_order_id = orders_file[-1]["order_ID"]
             return last_listed_order_id + 1
         
@@ -160,10 +185,11 @@ class ProfitCalculator:
             print("DEBUG: obtain_next_order_id funct error, error opening STORED_ORDERS_FILE. Returning 1 for order_ID.")
             return 1
 
+
     def amount_paid_input_function(self):
         while True:    
             try:
-                input_1 = float(input("Please input the amount paid: $").strip())
+                input_1 = float(input("\nPlease input the amount paid: $").strip())
                 if input_1 < 0:
                     print("Profit amount cannot be negative. Reprompting...")
                     continue
@@ -172,7 +198,7 @@ class ProfitCalculator:
                 print("Invalid input! Please enter a number for amount paid. Reprompting...")
                 continue
         
-            verification1 = input(f"Intended Value: {input_1} - (y/n): ")
+            verification1 = input(f"\nIntended Value: {input_1} - (y/n): ")
         
             if import_utils.is_yes_utils(verification1):
                 self.amount_paid = input_1
@@ -181,87 +207,61 @@ class ProfitCalculator:
                 print("Reprompting...")
                 continue
             else:
-                print("Did you mispell? Reprompting...")
+                print("Did you misspell? Reprompting...")
                 continue
 
-#I do this better later            
-    # def total_profit_calculation(self):
-    #     if not import_utils.STORED_ORDERS_FILE.exists():
-    #         self.total_profit = self.amount_paid
-    #         return self.total_profit
-           
-    #     with import_utils.STORED_ORDERS_FILE.open("r", encoding="utf-8") as f:
-    #         orders_file = json.load(f)
-
-    #     if not orders_file:
-    #         #mutates value and returns value, but is necessary
-    #         self.total_profit = 0
-    #         return self.total_profit
-
-    #     profit = 0
-    #     for ii in range(len(orders_file)):
-    #         profit += orders_file[ii]["amount_paid"]
-        
-    #     self.total_profit = profit + self.amount_paid
-
-    #     if self.total_profit is None:
-    #         self.total_profit = self.amount_paid
-
-    #     return self.total_profit
-    
-
-    # #stored_orders.json last index reliant
-    # def current_total_profit(self):
-    #     if not import_utils.STORED_ORDERS_FILE.exists():
-    #         return print("stored_orders.json does not exist, by extension there is not profit to pull from. (DEBUG most_recent_total_profit_ripper funct)")
-
-    #     with import_utils.STORED_ORDERS_FILE.open("r", encoding="utf-8") as f:
-    #         data = json.load(f)
-
-    #     profit_total = data[-1]["total_profit"]
-    #     print(f"{profit_total}")
-    #     return
 
     def request_stats_function(self):
+        import_utils.ge_file_checker(import_utils.STORED_ORDERS_FILE)
+
+        dt_rs = self.dt_request_stats()
+
         while True:
-            input1 = input("Display order array (d), Profit Total (t), or Exit (e): ")
-            stripped = input1.strip().lower()
+            stripped = input("\nDisplay order array (d), Profit Total (t), or Exit (e): ").strip().lower()
 
-            if stripped in ["d", "da", "display", "displayorderarray"]:
-                self.read_and_display_order_file()
+            handler = dt_rs.get(stripped)
 
-            elif stripped in ["t", "total", "profittotal"]:
-                #self.current_total_profit()
-                import_utils.npc_confirm(show_prompt=True)
+            if stripped in ("t", "total", "profittotal"):
+                #could cache this I bet
+                result = handler("total_profits")
+                return result
 
-            elif stripped in ["e", "exit"]:
-                return print("Exited Request Stats.")
-            
-            else:
-                print("Invalid input. Reprompting...")
+            if handler is None:
+                print("Invalid command.")
+                continue
+
+            if callable(handler):
+                handler()
+
+            #need a better way to exit than lambdas, implement in a later patch
+
+            continue
+
 
     def DEBUG_profit_prompt_handler(self):
-            while True:
-                input1 = input("---\nInput profit (p), Request stats (r), Delete customer (d), or Exit Program (exit): ")
-                stripped = input1.strip().lower()    
+        import_utils.ge_file_checker(import_utils.STORED_ORDERS_FILE)
 
-                if stripped in ["p", "profit", "input", "inputprofit"]:
-                    self.prompt_amount()
+        dt_pp = self.dt_profit_prompt_handler()
+        
+        while True:
+            stripped = input("\nProfit Handler:\nInput profit (p), Request stats (r), Delete customer (d), or Exit Program (exit): ").strip().lower()
 
-                elif stripped in ["r", "request", "requeststats"]:
-                    self.request_stats_function()
-                
-                elif stripped in ["d", "delete", "deletecustomer"]:
-                    self.delete_customer_order()
+            handler = dt_pp.get(stripped)
+            
+            if handler is None:
+                print("Invalid command.")
+                continue
+            
+            if callable(handler):
+                handler()
 
-                elif stripped in ["e", "exit"]:
-                    return print("Exited.")
-                else:
-                    print("Error: Invalid Prompt Handler Input. Reprompting...")
+            #need a better way to exit than lambdas, implement in a later patch
+
+            continue
 
 
     
 if __name__ == "__main__":
     pc = ProfitCalculator()
     pc.DEBUG_profit_prompt_handler()
-    
+
